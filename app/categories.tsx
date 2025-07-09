@@ -1,5 +1,5 @@
 import { LoadingSpinner } from "@/components/LoadingSpinner";
-import { getCategoryIcon } from "@/constants/CategoryIcons";
+import { getCategoryIcon, getCategoryImage } from "@/constants/CategoryIcons";
 import { BrandColors } from "@/constants/Colors";
 import { TriviaAPI } from "@/services/triviaAPI";
 import { Category } from "@/types";
@@ -11,15 +11,16 @@ import {
   Animated,
   Dimensions,
   FlatList,
+  Image,
   StyleSheet,
   TouchableOpacity,
   View,
 } from "react-native";
-import { Card, IconButton, Searchbar, Text } from "react-native-paper";
+import { Card, Chip, IconButton, Searchbar, Text } from "react-native-paper";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 const { width } = Dimensions.get("window");
-const ITEM_WIDTH = (width - 48) / 2; // 2 columns with padding
+const ITEM_WIDTH = width - 32; // Single column with padding
 
 export default function CategoriesScreen() {
   const router = useRouter();
@@ -54,12 +55,27 @@ export default function CategoriesScreen() {
     }
 
     const filtered: Category = {};
-    Object.entries(categories).forEach(([key, value]) => {
+    const queryLower = searchQuery.toLowerCase();
+
+    Object.entries(categories).forEach(([key, subcategories]) => {
       const categoryName = formatCategoryName(key);
-      if (categoryName.toLowerCase().includes(searchQuery.toLowerCase())) {
-        filtered[key] = value;
+
+      // Check if category name matches
+      const categoryMatches = categoryName.toLowerCase().includes(queryLower);
+
+      // Check if any subcategory matches
+      const subcategoryMatches = subcategories.some(
+        (subcat) =>
+          subcat.toLowerCase().includes(queryLower) ||
+          subcat.replace(/_/g, " ").toLowerCase().includes(queryLower)
+      );
+
+      // Include category if either category name or any subcategory matches
+      if (categoryMatches || subcategoryMatches) {
+        filtered[key] = subcategories;
       }
     });
+
     setFilteredCategories(filtered);
   };
 
@@ -89,6 +105,7 @@ export default function CategoriesScreen() {
     const [categoryKey, subcategories] = item;
     const categoryName = formatCategoryName(categoryKey);
     const icon = getCategoryIcon(categoryKey);
+    const imageUrl = getCategoryImage(categoryName);
 
     const scaleAnim = new Animated.Value(1);
 
@@ -111,6 +128,14 @@ export default function CategoriesScreen() {
       }, 150);
     };
 
+    const formatTopicName = (topic: string) => {
+      return topic
+        .replace(/_/g, " ")
+        .split(" ")
+        .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+        .join(" ");
+    };
+
     return (
       <Animated.View
         style={[styles.categoryItem, { transform: [{ scale: scaleAnim }] }]}
@@ -121,12 +146,44 @@ export default function CategoriesScreen() {
           activeOpacity={0.9}
         >
           <Card style={styles.categoryCard}>
+            <View style={styles.imageContainer}>
+              <Image
+                source={{ uri: imageUrl }}
+                style={styles.categoryImage}
+                defaultSource={require("@/assets/images/icon.png")}
+              />
+              <View style={styles.imageOverlay}>
+                <Text style={styles.categoryIcon}>{icon}</Text>
+              </View>
+            </View>
             <Card.Content style={styles.cardContent}>
-              <Text style={styles.categoryIcon}>{icon}</Text>
               <Text style={styles.categoryTitle}>{categoryName}</Text>
               <Text style={styles.subcategoryCount}>
                 {subcategories.length} topics
               </Text>
+              <View style={styles.topicsContainer}>
+                {subcategories.slice(0, 4).map((topic, idx) => (
+                  <Chip
+                    key={idx}
+                    style={styles.topicChip}
+                    textStyle={styles.topicChipText}
+                    mode="outlined"
+                    compact
+                  >
+                    {formatTopicName(topic)}
+                  </Chip>
+                ))}
+                {subcategories.length > 4 && (
+                  <Chip
+                    style={[styles.topicChip, styles.moreChip]}
+                    textStyle={styles.moreChipText}
+                    mode="outlined"
+                    compact
+                  >
+                    +{subcategories.length - 4}
+                  </Chip>
+                )}
+              </View>
             </Card.Content>
           </Card>
         </TouchableOpacity>
@@ -168,9 +225,8 @@ export default function CategoriesScreen() {
         data={categoryEntries}
         renderItem={renderCategoryItem}
         keyExtractor={([key]) => key}
-        numColumns={2}
+        numColumns={1}
         contentContainerStyle={styles.listContent}
-        columnWrapperStyle={categoryEntries.length > 1 ? styles.row : undefined}
         showsVerticalScrollIndicator={false}
         ListEmptyComponent={
           <View style={styles.emptyContainer}>
@@ -223,7 +279,8 @@ const styles = StyleSheet.create({
   },
   categoryItem: {
     width: ITEM_WIDTH,
-    margin: 8,
+    marginBottom: 16,
+    alignSelf: "center",
   },
   categoryTouchable: {
     flex: 1,
@@ -236,28 +293,76 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 4,
+    minHeight: 250,
   },
   cardContent: {
-    padding: 20,
-    alignItems: "center",
+    padding: 16,
+    alignItems: "flex-start",
     minHeight: 120,
-    justifyContent: "center",
+    justifyContent: "flex-start",
+  },
+  imageContainer: {
+    width: "100%",
+    height: 150,
+    borderTopLeftRadius: 16,
+    borderTopRightRadius: 16,
+    overflow: "hidden",
+    position: "relative",
+  },
+  categoryImage: {
+    width: "100%",
+    height: "100%",
+    resizeMode: "cover",
+  },
+  imageOverlay: {
+    position: "absolute",
+    top: 8,
+    right: 8,
+    backgroundColor: "rgba(0, 0, 0, 0.6)",
+    borderRadius: 20,
+    padding: 6,
   },
   categoryIcon: {
-    fontSize: 32,
-    marginBottom: 12,
+    fontSize: 20,
+    color: "white",
   },
   categoryTitle: {
     fontSize: 16,
     fontWeight: "600",
     color: BrandColors.text,
-    textAlign: "center",
-    marginBottom: 8,
+    marginBottom: 4,
   },
   subcategoryCount: {
     fontSize: 12,
     color: BrandColors.textSecondary,
-    textAlign: "center",
+    marginBottom: 8,
+  },
+  topicsContainer: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 4,
+  },
+  topicChip: {
+    backgroundColor: BrandColors.background,
+    borderColor: BrandColors.border,
+    borderWidth: 1,
+    height: 24,
+    marginRight: 4,
+    marginBottom: 4,
+  },
+  topicChipText: {
+    fontSize: 10,
+    color: BrandColors.textSecondary,
+    lineHeight: 12,
+  },
+  moreChip: {
+    backgroundColor: BrandColors.primary,
+    borderColor: BrandColors.primary,
+  },
+  moreChipText: {
+    fontSize: 10,
+    color: BrandColors.background,
+    lineHeight: 12,
   },
   emptyContainer: {
     flex: 1,

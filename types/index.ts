@@ -9,6 +9,10 @@ export interface TriviaQuestion {
   tags: string[];
 }
 
+export interface PreparedTriviaQuestion extends TriviaQuestion {
+  allAnswers: string[];
+}
+
 export interface QuizSettings {
   numberOfQuestions: number;
   timeLimit: number; // 0 means no time limit

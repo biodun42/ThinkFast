@@ -1,5 +1,5 @@
 import * as Haptics from "expo-haptics";
-import { TriviaQuestion } from "../types";
+import { PreparedTriviaQuestion, TriviaQuestion } from "../types";
 
 export const shuffleArray = <T>(array: T[]): T[] => {
   const shuffled = [...array];
@@ -31,7 +31,7 @@ export const getScoreMessage = (percentage: number): string => {
 
 export const prepareQuestion = (
   question: TriviaQuestion
-): TriviaQuestion & { allAnswers: string[] } => {
+): PreparedTriviaQuestion => {
   const allAnswers = shuffleArray([
     question.correctAnswer,
     ...question.incorrectAnswers,

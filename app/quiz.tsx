@@ -5,7 +5,12 @@ import { TimerBar } from "@/components/TimerBar";
 import { BrandColors } from "@/constants/Colors";
 import { StorageService } from "@/services/storage";
 import { TriviaAPI } from "@/services/triviaAPI";
-import { Lifeline, TriviaQuestion, UserAnswer } from "@/types";
+import {
+  Lifeline,
+  PreparedTriviaQuestion,
+  TriviaQuestion,
+  UserAnswer,
+} from "@/types";
 import {
   getScorePercentage,
   prepareQuestion,
@@ -75,7 +80,7 @@ export default function QuizScreen() {
     searchQuery?: string;
   }>();
 
-  const [questions, setQuestions] = useState<TriviaQuestion[]>([]);
+  const [questions, setQuestions] = useState<PreparedTriviaQuestion[]>([]);
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [userAnswers, setUserAnswers] = useState<UserAnswer[]>([]);
   const [selectedAnswer, setSelectedAnswer] = useState<string | null>(null);
@@ -125,6 +130,19 @@ export default function QuizScreen() {
           totalQuestions,
           difficulty
         );
+
+        // If search returned very few results, show a warning
+        if (data.length < totalQuestions) {
+          Alert.alert(
+            "Search Results",
+            `Found ${data.length} questions for "${searchQuery}". ${
+              data.length < totalQuestions
+                ? "Some random questions were added."
+                : ""
+            }`,
+            [{ text: "OK" }]
+          );
+        }
       } else {
         data = await TriviaAPI.getQuestions(
           totalQuestions,
@@ -133,7 +151,11 @@ export default function QuizScreen() {
         );
       }
 
-      setQuestions(data);
+      // Prepare questions with shuffled answers once
+      const preparedQuestions = data.map((question) =>
+        prepareQuestion(question)
+      );
+      setQuestions(preparedQuestions);
       setQuestionStartTime(Date.now());
       if (hasTimer) {
         setTimeLeft(timeLimitNum);
@@ -271,7 +293,7 @@ export default function QuizScreen() {
     );
     setLifelines(updatedLifelines);
 
-    const currentQuestion = prepareQuestion(questions[currentQuestionIndex]);
+    const currentQuestion = questions[currentQuestionIndex];
 
     switch (lifeline.id) {
       case "fifty_fifty":
@@ -354,7 +376,7 @@ export default function QuizScreen() {
     );
   }
 
-  const currentQuestion = prepareQuestion(questions[currentQuestionIndex]);
+  const currentQuestion = questions[currentQuestionIndex];
   const progress = (currentQuestionIndex + 1) / totalQuestions;
 
   return (

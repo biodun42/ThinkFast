@@ -6,8 +6,16 @@ import { getRandomCategory, triggerHaptic } from "@/utils/helpers";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import React, { useEffect, useState } from "react";
-import { Alert, Animated, StyleSheet, View } from "react-native";
-import { Button, Searchbar, Text } from "react-native-paper";
+import {
+  Alert,
+  Animated,
+  Keyboard,
+  Platform,
+  StyleSheet,
+  TextInput,
+  View,
+} from "react-native";
+import { Button, Text } from "react-native-paper";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 export default function MainMenuScreen() {
@@ -17,6 +25,7 @@ export default function MainMenuScreen() {
   const [isFirstLaunch, setIsFirstLaunch] = useState(true);
   const [isCheckingFirstLaunch, setIsCheckingFirstLaunch] = useState(true);
   const [dailyChallenge, setDailyChallenge] = useState<any>(null);
+  const [isSearching, setIsSearching] = useState(false);
   const fadeAnim = React.useRef(new Animated.Value(0)).current;
   const slideAnim = React.useRef(new Animated.Value(50)).current;
 
@@ -134,20 +143,89 @@ export default function MainMenuScreen() {
     }
   };
 
-  const handleSearch = () => {
+  const handleSearch = async () => {
     if (searchQuery.trim()) {
+      setIsSearching(true);
       triggerHaptic("light");
-      router.push({
-        pathname: "/quiz" as any,
-        params: {
-          numberOfQuestions: "10",
-          timeLimit: "30",
-          category: "search",
-          categoryDisplayName: `Search: ${searchQuery}`,
-          searchQuery: searchQuery.trim(),
-          difficulty: "medium",
-        },
-      });
+
+      // Dismiss keyboard
+      Keyboard.dismiss();
+
+      try {
+        // First, try to find a matching category or subcategory
+        const categories = await TriviaAPI.getCategories();
+        const queryLower = searchQuery.trim().toLowerCase();
+
+        let matchedCategory = null;
+        let matchedCategoryName = null;
+
+        // Search through categories and subcategories
+        for (const [categoryName, subcategories] of Object.entries(
+          categories
+        )) {
+          // Check if category name matches
+          if (categoryName.toLowerCase().includes(queryLower)) {
+            matchedCategory = categoryName;
+            matchedCategoryName = categoryName;
+            break;
+          }
+
+          // Check if any subcategory matches
+          const matchingSubcategory = subcategories.find(
+            (subcat: string) =>
+              subcat.toLowerCase().includes(queryLower) ||
+              subcat.replace(/_/g, " ").toLowerCase().includes(queryLower)
+          );
+
+          if (matchingSubcategory) {
+            matchedCategory = matchingSubcategory;
+            matchedCategoryName = categoryName;
+            break;
+          }
+        }
+
+        if (matchedCategory) {
+          // Use the matched category for questions
+          router.push({
+            pathname: "/quiz" as any,
+            params: {
+              numberOfQuestions: "10",
+              timeLimit: "30",
+              category: matchedCategory,
+              categoryDisplayName: `${matchedCategoryName}: ${searchQuery.trim()}`,
+              difficulty: "medium",
+            },
+          });
+        } else {
+          // If no category matches, show available categories
+          Alert.alert(
+            "No Match Found",
+            `No category found for "${searchQuery.trim()}". Available categories: Arts & Literature, Film & TV, Food & Drink, General Knowledge, Geography, History, Music, Science, Society & Culture, Sport & Leisure.`,
+            [
+              { text: "OK" },
+              {
+                text: "Browse Categories",
+                onPress: () => router.push("/categories" as any),
+              },
+            ]
+          );
+        }
+      } catch (error) {
+        Alert.alert(
+          "Search Error",
+          "Could not search for questions. Please check your internet connection."
+        );
+      } finally {
+        setIsSearching(false);
+      }
+    } else {
+      Alert.alert("Search", "Please enter a search term first.");
+    }
+  };
+
+  const handleSearchKeyPress = (event: any) => {
+    if (event.nativeEvent.key === "Enter") {
+      handleSearch();
     }
   };
 
@@ -182,15 +260,91 @@ export default function MainMenuScreen() {
             Test your knowledge at lightning speed!
           </Text>
 
-          <Searchbar
-            placeholder="Search for a topic..."
-            onChangeText={setSearchQuery}
-            value={searchQuery}
-            onSubmitEditing={handleSearch}
-            style={styles.searchBar}
-            inputStyle={styles.searchInput}
-            iconColor={BrandColors.primary}
-          />
+          <View style={styles.searchContainer}>
+            <TextInput
+              placeholder="Search categories (e.g., science, movies, history)..."
+              onChangeText={setSearchQuery}
+              value={searchQuery}
+              onSubmitEditing={handleSearch}
+              onKeyPress={handleSearchKeyPress}
+              style={styles.searchInput}
+              placeholderTextColor={BrandColors.textSecondary}
+              returnKeyType="search"
+              blurOnSubmit={true}
+              autoCapitalize="none"
+              autoCorrect={false}
+              autoComplete="off"
+              keyboardType="default"
+              editable={true}
+              selectTextOnFocus={true}
+            />
+            {searchQuery.length > 0 && (
+              <Button
+                mode="text"
+                onPress={() => setSearchQuery("")}
+                style={styles.searchIconButton}
+                labelStyle={styles.searchIconButtonText}
+              >
+                <Ionicons
+                  name="close"
+                  size={20}
+                  color={BrandColors.textSecondary}
+                />
+              </Button>
+            )}
+            <Button
+              mode="text"
+              onPress={handleSearch}
+              loading={isSearching}
+              disabled={isSearching}
+              style={styles.searchIconButton}
+              labelStyle={styles.searchIconButtonText}
+            >
+              <Ionicons name="search" size={20} color={BrandColors.primary} />
+            </Button>
+          </View>
+
+          {searchQuery.trim() && (
+            <Button
+              mode="outlined"
+              onPress={handleSearch}
+              loading={isSearching}
+              disabled={isSearching}
+              style={styles.searchButton}
+              labelStyle={styles.searchButtonText}
+              icon={() => (
+                <Ionicons name="search" size={16} color={BrandColors.primary} />
+              )}
+            >
+              Search "{searchQuery.trim()}"
+            </Button>
+          )}
+
+          {!searchQuery.trim() && (
+            <View style={styles.searchSuggestions}>
+              <Text style={styles.suggestionLabel}>Popular topics:</Text>
+              <View style={styles.suggestionTags}>
+                {[
+                  "Science",
+                  "History",
+                  "Film",
+                  "Music",
+                  "Sports",
+                ].map((topic) => (
+                  <Button
+                    key={topic}
+                    mode="outlined"
+                    compact
+                    onPress={() => setSearchQuery(topic)}
+                    style={styles.suggestionTag}
+                    labelStyle={styles.suggestionTagText}
+                  >
+                    {topic}
+                  </Button>
+                ))}
+              </View>
+            </View>
+          )}
         </View>
 
         <View style={styles.buttonContainer}>
@@ -315,9 +469,84 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     marginBottom: 16,
     elevation: 2,
+    shadowColor: Platform.OS === "ios" ? "#000" : "transparent",
+    shadowOffset:
+      Platform.OS === "ios" ? { width: 0, height: 2 } : { width: 0, height: 0 },
+    shadowOpacity: Platform.OS === "ios" ? 0.1 : 0,
+    shadowRadius: Platform.OS === "ios" ? 4 : 0,
+    width: "100%",
+    minHeight: 56,
+  },
+  searchContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: BrandColors.card,
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    marginBottom: 16,
+    elevation: 2,
+    shadowColor: Platform.OS === "ios" ? "#000" : "transparent",
+    shadowOffset:
+      Platform.OS === "ios" ? { width: 0, height: 2 } : { width: 0, height: 0 },
+    shadowOpacity: Platform.OS === "ios" ? 0.1 : 0,
+    shadowRadius: Platform.OS === "ios" ? 4 : 0,
+    width: "100%",
+    minHeight: 56,
   },
   searchInput: {
+    flex: 1,
     color: BrandColors.text,
+    fontSize: 16,
+    minHeight: Platform.OS === "ios" ? 20 : 16,
+    paddingVertical: Platform.OS === "ios" ? 8 : 4,
+    paddingHorizontal: 0,
+  },
+  searchIconButton: {
+    margin: 0,
+    padding: 8,
+  },
+  searchIconButtonText: {
+    margin: 0,
+    padding: 0,
+  },
+  searchButton: {
+    borderColor: BrandColors.primary,
+    borderWidth: 1,
+    borderRadius: 8,
+    marginTop: 8,
+  },
+  searchButtonText: {
+    fontSize: 14,
+    fontWeight: "500",
+    color: BrandColors.primary,
+  },
+  searchSuggestions: {
+    marginTop: 12,
+    alignItems: "center",
+  },
+  suggestionLabel: {
+    fontSize: 12,
+    color: BrandColors.textSecondary,
+    marginBottom: 8,
+    textTransform: "uppercase",
+  },
+  suggestionTags: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+    justifyContent: "center",
+  },
+  suggestionTag: {
+    borderColor: BrandColors.border,
+    borderWidth: 1,
+    borderRadius: 16,
+    minWidth: 60,
+  },
+  suggestionTagText: {
+    fontSize: 12,
+    fontWeight: "500",
+    color: BrandColors.textSecondary,
   },
   buttonContainer: {
     gap: 16,
@@ -371,6 +600,11 @@ const styles = StyleSheet.create({
   footer: {
     alignItems: "center",
     paddingBottom: 20,
+    paddingTop: 10,
+    borderTopWidth: 1,
+    borderColor: BrandColors.border,
+    backgroundColor: BrandColors.background,
+    marginTop: 20,
   },
   footerText: {
     color: BrandColors.textSecondary,

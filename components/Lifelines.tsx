@@ -113,6 +113,7 @@ const styles = StyleSheet.create({
     justifyContent: "space-around",
     marginBottom: 16,
     paddingHorizontal: 8,
+    gap: 8,
   },
   button: {
     alignItems: "center",
