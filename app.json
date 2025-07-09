@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "thinkfast",
+    "name": "ThinkFast",
     "slug": "thinkfast",
     "version": "1.0.0",
     "orientation": "portrait",
@@ -37,6 +37,13 @@
     ],
     "experiments": {
       "typedRoutes": true
-    }
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "0869d4a0-e450-4c08-8142-e35d7e55994b"
+      }
+    },
+    "owner": "biodun42"
   }
 }
